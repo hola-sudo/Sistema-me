@@ -41,7 +41,12 @@ public class AuthController : ControllerBase
         try
         {
             var result = await _authService.RegisterAsync(dto);
-            return Ok(new { message = "Usuario creado exitosamente." });
+            if (!result)
+            {
+                return Conflict(new ApiResponse<object>(409, "El correo ya está registrado o el rol no existe."));
+            }
+
+            return Ok(new ApiResponse<object>(200, "Usuario creado exitosamente."));
 
         }
         catch (DbUpdateException ex)

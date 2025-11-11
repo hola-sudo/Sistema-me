@@ -2,7 +2,7 @@
 
 services:
   sqlserver:
-    image: mcr.microsoft.com/sqlserver/linux/server:2019-latest
+    image: mcr.microsoft.com/mssql/server:2019-latest
     platform: linux/amd64
     restart: always
     container_name: sqlserver
