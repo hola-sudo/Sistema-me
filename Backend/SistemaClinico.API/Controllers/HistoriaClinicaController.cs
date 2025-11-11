@@ -37,8 +37,8 @@ namespace SistemaClinico.API.Controllers
             {
                 return BadRequest(ModelState);
             }
-            await _historiaClinicaService.CrearHistoriaClinicaAsync(historiaClinica);
-            return CreatedAtAction(nameof(GetHistoriaClinicaById), new { id = historiaClinica.PacienteId }, historiaClinica);
+            var creada = await _historiaClinicaService.CrearHistoriaClinicaAsync(historiaClinica);
+            return CreatedAtAction(nameof(GetHistoriaClinicaById), new { id = creada.Id }, creada);
         }
         [HttpPut("{id}")]
         public async Task<IActionResult> ActualizarHistoriaClinica(int id, [FromBody] HistoriaClinicaCreateDto historiaClinica)

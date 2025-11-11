@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
@@ -138,7 +140,7 @@ namespace SistemaClinico.Infrastructure.Services
                 // Buscar el rol por nombre
                 var rol = await _context.Roles.FirstOrDefaultAsync(r => r.Id == dto.RolId);
                 if (rol == null)
-                    return false; // o lanzar excepción
+                    throw new KeyNotFoundException("El rol especificado no existe.");
 
                 var usuario = new Usuario
                 {
@@ -177,8 +179,8 @@ namespace SistemaClinico.Infrastructure.Services
             }
             catch (Exception ex)
             {
-                Console.Write(ex.Message);
-                return false;
+                Console.Error.WriteLine($"Error registrando usuario: {ex.Message}");
+                throw;
             }
 
         }

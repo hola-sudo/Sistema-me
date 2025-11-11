@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -51,7 +53,8 @@ public class AuthController : ControllerBase
         }
         catch (DbUpdateException ex)
         {
-            if (ex.InnerException.Message.Contains("UNIQUE"))
+            var innerMessage = ex.InnerException?.Message ?? string.Empty;
+            if (innerMessage.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase))
             {
                 return BadRequest(new ApiResponse<object>(409, "El correo ya está registrado o el rol no existe."));
             }
@@ -59,6 +62,15 @@ public class AuthController : ControllerBase
             {
                 return BadRequest(new ApiResponse<object>(400, "Problema registrando el usuario"));
             }
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new ApiResponse<object>(404, ex.Message));
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error inesperado al registrar usuario: {ex.Message}");
+            return StatusCode(500, new ApiResponse<object>(500, "Error interno al registrar el usuario."));
         }
     }
     [Authorize]

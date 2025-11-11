@@ -7,7 +7,7 @@ namespace SistemaClinico.Core.Interfaces
     {
         Task<HistoriaClinicaResponseDto> GetHistoriaClinicaByIdAsync(int id);
         Task<IEnumerable<HistoriaClinicaResponseDto>> GetHistoriasClinicaByPacienteIdAsync(int pacienteId);
-        Task CrearHistoriaClinicaAsync(HistoriaClinicaCreateDto historiaClinica);
+        Task<HistoriaClinicaResponseDto> CrearHistoriaClinicaAsync(HistoriaClinicaCreateDto historiaClinica);
         Task ActualizarHistoriaClinicaAsync(int id, HistoriaClinicaCreateDto historiaClinica);
         Task EliminarHistoriaClinicaAsync(int id);
     }

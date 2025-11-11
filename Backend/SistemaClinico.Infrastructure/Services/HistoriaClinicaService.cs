@@ -21,6 +21,7 @@ namespace SistemaClinico.Infrastructure.Services
                 .Include(h => h.Doctor)
                 .Include(h => h.MotivoConsulta)
                 .Include(h => h.Diagnostico)
+                .Include(h => h.Especialidad)
                 .Include(h => h.UsuarioCreated)
                 .Include(h => h.UsuarioModified)
                 .FirstOrDefaultAsync(h => h.Id == id);
@@ -37,6 +38,8 @@ namespace SistemaClinico.Infrastructure.Services
                 DoctorNombre = historiaClinica.Doctor?.Nombre ?? "",
                 MotivoConsultaId = historiaClinica.MotivoConsultaId,
                 MotivoConsultaNombre = historiaClinica.MotivoConsulta?.Nombre ?? "",
+                EspecialidadId = historiaClinica.EspecialidadId,
+                EspecialidadNombre = historiaClinica.Especialidad?.Nombre ?? "",
                 DiagnosticoId = historiaClinica.DiagnosticoId,
                 DiagnosticoNombre = historiaClinica.Diagnostico?.Nombre ?? "",
                 UsuarioCreatedId = historiaClinica.UsuarioCreatedId,
@@ -54,6 +57,7 @@ namespace SistemaClinico.Infrastructure.Services
                 .Include(h => h.Doctor)
                 .Include(h => h.MotivoConsulta)
                 .Include(h => h.Diagnostico)
+                .Include(h => h.Especialidad)
                 .Include(h => h.UsuarioCreated)
                 .Include(h => h.UsuarioModified)
                 .ToListAsync();
@@ -67,6 +71,8 @@ namespace SistemaClinico.Infrastructure.Services
                 DoctorNombre = h.Doctor?.Nombre ?? "",
                 MotivoConsultaId = h.MotivoConsultaId,
                 MotivoConsultaNombre = h.MotivoConsulta?.Nombre ?? "",
+                EspecialidadId = h.EspecialidadId,
+                EspecialidadNombre = h.Especialidad?.Nombre ?? "",
                 DiagnosticoId = h.DiagnosticoId,
                 DiagnosticoNombre = h.Diagnostico?.Nombre ?? "",
                 UsuarioCreatedId = h.UsuarioCreatedId,
@@ -77,7 +83,7 @@ namespace SistemaClinico.Infrastructure.Services
             });
         }
 
-        public async Task CrearHistoriaClinicaAsync(HistoriaClinicaCreateDto dto)
+        public async Task<HistoriaClinicaResponseDto> CrearHistoriaClinicaAsync(HistoriaClinicaCreateDto dto)
         {
             // Validaciones
             if (!await _context.Pacientes.AnyAsync(p => p.Id == dto.PacienteId))
@@ -88,6 +94,9 @@ namespace SistemaClinico.Infrastructure.Services
 
             if (!await _context.MotivosConsulta.AnyAsync(m => m.Id == dto.MotivoConsultaId))
                 throw new Exception("El motivo de consulta no existe.");
+
+            if (!await _context.Especialidades.AnyAsync(e => e.Id == dto.EspecialidadId))
+                throw new Exception("La especialidad no existe.");
 
             if (!await _context.Diagnosticos.AnyAsync(d => d.Id == dto.DiagnosticoId))
                 throw new Exception("El diagnóstico no existe.");
@@ -103,6 +112,7 @@ namespace SistemaClinico.Infrastructure.Services
                 PacienteId = dto.PacienteId,
                 DoctorId = dto.DoctorId,
                 MotivoConsultaId = dto.MotivoConsultaId,
+                EspecialidadId = dto.EspecialidadId,
                 DiagnosticoId = dto.DiagnosticoId,
                 UsuarioCreatedId = dto.UsuarioCreatedId,
                 UsuarioModifiedId = dto.UsuarioModifiedId,
@@ -112,6 +122,33 @@ namespace SistemaClinico.Infrastructure.Services
 
             _context.HistoriasClinicas.Add(nueva);
             await _context.SaveChangesAsync();
+
+            await _context.Entry(nueva).Reference(h => h.Doctor).LoadAsync();
+            await _context.Entry(nueva).Reference(h => h.MotivoConsulta).LoadAsync();
+            await _context.Entry(nueva).Reference(h => h.Diagnostico).LoadAsync();
+            await _context.Entry(nueva).Reference(h => h.Especialidad).LoadAsync();
+            await _context.Entry(nueva).Reference(h => h.UsuarioCreated).LoadAsync();
+            await _context.Entry(nueva).Reference(h => h.UsuarioModified).LoadAsync();
+
+            return new HistoriaClinicaResponseDto
+            {
+                Id = nueva.Id,
+                PacienteId = nueva.PacienteId,
+                FechaRegistro = nueva.FechaRegistro,
+                DoctorId = nueva.DoctorId,
+                DoctorNombre = nueva.Doctor?.Nombre ?? "",
+                MotivoConsultaId = nueva.MotivoConsultaId,
+                MotivoConsultaNombre = nueva.MotivoConsulta?.Nombre ?? "",
+                EspecialidadId = nueva.EspecialidadId,
+                EspecialidadNombre = nueva.Especialidad?.Nombre ?? "",
+                DiagnosticoId = nueva.DiagnosticoId,
+                DiagnosticoNombre = nueva.Diagnostico?.Nombre ?? "",
+                UsuarioCreatedId = nueva.UsuarioCreatedId,
+                UsuarioCreatedNombre = nueva.UsuarioCreated?.Nombre ?? "",
+                UsuarioModifiedId = nueva.UsuarioModifiedId,
+                UsuarioModifiedNombre = nueva.UsuarioModified?.Nombre ?? "",
+                Tratamiento = nueva.Tratamiento
+            };
         }
 
         public async Task ActualizarHistoriaClinicaAsync(int id, HistoriaClinicaCreateDto dto)
@@ -120,9 +157,28 @@ namespace SistemaClinico.Infrastructure.Services
             if (historia == null)
                 throw new KeyNotFoundException($"Historia Clínica con ID {id} no encontrada.");
 
+            if (!await _context.Pacientes.AnyAsync(p => p.Id == dto.PacienteId))
+                throw new Exception("El paciente no existe.");
+
+            if (!await _context.Doctores.AnyAsync(d => d.Id == dto.DoctorId))
+                throw new Exception("El doctor no existe.");
+
+            if (!await _context.MotivosConsulta.AnyAsync(m => m.Id == dto.MotivoConsultaId))
+                throw new Exception("El motivo de consulta no existe.");
+
+            if (!await _context.Especialidades.AnyAsync(e => e.Id == dto.EspecialidadId))
+                throw new Exception("La especialidad no existe.");
+
+            if (!await _context.Diagnosticos.AnyAsync(d => d.Id == dto.DiagnosticoId))
+                throw new Exception("El diagnóstico no existe.");
+
+            if (!await _context.Usuarios.AnyAsync(u => u.Id == dto.UsuarioModifiedId))
+                throw new Exception("El usuario que modifica no existe.");
+
             historia.PacienteId = dto.PacienteId;
             historia.DoctorId = dto.DoctorId;
             historia.MotivoConsultaId = dto.MotivoConsultaId;
+            historia.EspecialidadId = dto.EspecialidadId;
             historia.DiagnosticoId = dto.DiagnosticoId;
             historia.UsuarioModifiedId = dto.UsuarioModifiedId;
             historia.Tratamiento = dto.Tratamiento;

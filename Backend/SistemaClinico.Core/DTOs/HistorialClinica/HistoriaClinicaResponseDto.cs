@@ -13,6 +13,8 @@ namespace SistemaClinico.Core.DTOs.HistorialClinica
         public string PacienteNombre { get; set; } = string.Empty;
         public int MotivoConsultaId { get; set; }
         public string MotivoConsultaNombre { get; set; } = string.Empty;
+        public int EspecialidadId { get; set; }
+        public string EspecialidadNombre { get; set; } = string.Empty;
         public int DiagnosticoId { get; set; }
         public string DiagnosticoNombre { get; set; } = string.Empty;
         public int DoctorId { get; set; }
