@@ -9,6 +9,11 @@ using SistemaClinico.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Validar connection string
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrEmpty(connectionString))
+    throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured. Please set it in appsettings.json or environment variables.");
+
 // Configurar DbContext
 // Agrega el DbContext con SQL Server
 /*builder.Services.AddDbContext<AppDbContext>(options =>
@@ -17,17 +22,35 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Agrega el DbContext con SQLite
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlite(connectionString));
 
 // 1. Configura la política CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    if (builder.Environment.IsDevelopment())
     {
-        policy.AllowAnyOrigin()    // o .WithOrigins("http://localhost:4200") para producción
-              .AllowAnyHeader()
-              .AllowAnyMethod();
-    });
+        // En desarrollo, permite cualquier origen
+        options.AddPolicy("AllowAll", policy =>
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        });
+    }
+    else
+    {
+        // En producción, restringe a orígenes específicos
+        var allowedOrigins = builder.Configuration["Cors:AllowedOrigins"]?.Split(',') 
+            ?? new[] { "http://localhost:4200" };
+        
+        options.AddPolicy("AllowAll", policy =>
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        });
+    }
 });
 // Configurar servicios de inyección de dependencias
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -38,6 +61,19 @@ builder.Services.AddScoped<IDotoresService, DotoresService>();
 builder.Services.AddScoped<IRolService, RolService>();
 
 // Configurar autenticación JWT
+var jwtKey = builder.Configuration["Jwt:Key"];
+var jwtIssuer = builder.Configuration["Jwt:Issuer"];
+var jwtAudience = builder.Configuration["Jwt:Audience"];
+
+if (string.IsNullOrEmpty(jwtKey))
+    throw new InvalidOperationException("JWT Key is not configured. Please set 'Jwt:Key' in appsettings.json or environment variables.");
+
+if (string.IsNullOrEmpty(jwtIssuer))
+    throw new InvalidOperationException("JWT Issuer is not configured. Please set 'Jwt:Issuer' in appsettings.json or environment variables.");
+
+if (string.IsNullOrEmpty(jwtAudience))
+    throw new InvalidOperationException("JWT Audience is not configured. Please set 'Jwt:Audience' in appsettings.json or environment variables.");
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -47,10 +83,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
+                Encoding.UTF8.GetBytes(jwtKey)
             )
         };
     });
@@ -75,6 +111,24 @@ builder.Services.AddSwaggerGen(options =>
 
 
 var app = builder.Build();
+
+// Inicializar base de datos si no existe
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<AppDbContext>();
+        // Asegurar que la base de datos se crea si no existe
+        context.Database.EnsureCreated();
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "An error occurred while initializing the database.");
+    }
+}
+
 // 2. Usa CORS en la app
 app.UseCors("AllowAll");
 

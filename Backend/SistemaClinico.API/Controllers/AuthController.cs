@@ -46,7 +46,7 @@ public class AuthController : ControllerBase
         }
         catch (DbUpdateException ex)
         {
-            if (ex.InnerException.Message.Contains("UNIQUE"))
+            if (ex.InnerException?.Message?.Contains("UNIQUE") == true)
             {
                 return BadRequest(new ApiResponse<object>(409, "El correo ya está registrado o el rol no existe."));
             }
@@ -54,6 +54,11 @@ public class AuthController : ControllerBase
             {
                 return BadRequest(new ApiResponse<object>(400, "Problema registrando el usuario"));
             }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error en registro: " + ex.Message);
+            return BadRequest(new ApiResponse<object>(400, "Error al registrar el usuario: " + ex.Message));
         }
     }
     [Authorize]

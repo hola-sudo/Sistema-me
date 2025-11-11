@@ -24,7 +24,12 @@ namespace SistemaClinico.Infrastructure.Services
         public Task<bool> ValidateTokenAsync(string token)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.UTF8.GetBytes(_config["Jwt:Key"]!);
+            var jwtKey = _config["Jwt:Key"];
+            
+            if (string.IsNullOrEmpty(jwtKey))
+                throw new InvalidOperationException("JWT Key is not configured.");
+
+            var key = Encoding.UTF8.GetBytes(jwtKey);
 
             try
             {
@@ -67,7 +72,11 @@ namespace SistemaClinico.Infrastructure.Services
                 new Claim(ClaimTypes.Role, usuario.Rol?.Nombre ?? string.Empty)
             };
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
+            var jwtKey = _config["Jwt:Key"];
+            if (string.IsNullOrEmpty(jwtKey))
+                throw new InvalidOperationException("JWT Key is not configured.");
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(
@@ -98,7 +107,11 @@ namespace SistemaClinico.Infrastructure.Services
                 new Claim(ClaimTypes.Role, usuario.Rol?.Nombre ?? string.Empty)
             };
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
+            var jwtKey = _config["Jwt:Key"];
+            if (string.IsNullOrEmpty(jwtKey))
+                throw new InvalidOperationException("JWT Key is not configured.");
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(
@@ -130,57 +143,68 @@ namespace SistemaClinico.Infrastructure.Services
 
         public async Task<bool> RegisterAsync(RegisterRequestDto dto)
         {
-            try
+            var exists = await _context.Usuarios.AnyAsync(u => u.Correo == dto.Correo);
+            if (exists) 
+                throw new InvalidOperationException("El correo ya está registrado.");
+
+            // Buscar el rol por ID
+            var rol = await _context.Roles.FirstOrDefaultAsync(r => r.Id == dto.RolId);
+            if (rol == null)
+                throw new ArgumentException($"El rol con ID {dto.RolId} no existe.");
+
+            var usuario = new Usuario
             {
-                var exists = await _context.Usuarios.AnyAsync(u => u.Correo == dto.Correo);
-                if (exists) return false;
+                Nombre = dto.Nombre,
+                Correo = dto.Correo,
+                ClaveHash = BCrypt.Net.BCrypt.HashPassword(dto.Clave),
+                RolId = rol.Id
+            };
 
-                // Buscar el rol por nombre
-                var rol = await _context.Roles.FirstOrDefaultAsync(r => r.Id == dto.RolId);
-                if (rol == null)
-                    return false; // o lanzar excepción
+            _context.Usuarios.Add(usuario);
+            await _context.SaveChangesAsync();
+            
+            if (dto.EsDoctor)
+            {
+                if (dto.EspecialidadIds == null || !dto.EspecialidadIds.Any())
+                    throw new ArgumentException("Las especialidades son requeridas cuando se registra un doctor.");
 
-                var usuario = new Usuario
+                if (string.IsNullOrEmpty(dto.Apellido))
+                    throw new ArgumentException("El apellido es requerido para doctores.");
+                
+                if (string.IsNullOrEmpty(dto.Documento))
+                    throw new ArgumentException("El documento es requerido para doctores.");
+                
+                if (string.IsNullOrEmpty(dto.Telefono))
+                    throw new ArgumentException("El teléfono es requerido para doctores.");
+                
+                if (string.IsNullOrEmpty(dto.Exequatur))
+                    throw new ArgumentException("El exequatur es requerido para doctores.");
+
+                var especialidades = await _context.Especialidades
+                    .Where(e => dto.EspecialidadIds.Contains(e.Id)).ToListAsync();
+
+                if (especialidades.Count != dto.EspecialidadIds.Count)
+                    throw new ArgumentException("Una o más especialidades no son válidas.");
+
+                var doctor = new Doctor
                 {
                     Nombre = dto.Nombre,
+                    Apellido = dto.Apellido,
+                    Documento = dto.Documento,
+                    Telefono = dto.Telefono,
                     Correo = dto.Correo,
-                    ClaveHash = BCrypt.Net.BCrypt.HashPassword(dto.Clave),
-                    RolId = rol.Id
+                    Exequatur = dto.Exequatur,
+                    UsuarioId = usuario.Id,
+                    DoctorEspecialidades = especialidades.Select(e => new DoctorEspecialidad
+                    {
+                        EspecialidadId = e.Id
+                    }).ToList()
                 };
 
-                _context.Usuarios.Add(usuario);
+                _context.Doctores.Add(doctor);
                 await _context.SaveChangesAsync();
-                if (dto.EsDoctor)
-                {
-                    var especialidades = await _context.Especialidades
-                        .Where(e => dto.EspecialidadIds.Contains(e.Id)).ToListAsync();
-
-                    var doctor = new Doctor
-                    {
-                        Nombre = dto.Nombre,
-                        Apellido = dto.Apellido!,
-                        Documento = dto.Documento!,
-                        Telefono = dto.Telefono!,
-                        Correo = dto.Correo,
-                        Exequatur = dto.Exequatur!,
-                        UsuarioId = usuario.Id,
-                        DoctorEspecialidades = especialidades.Select(e => new DoctorEspecialidad
-                        {
-                            EspecialidadId = e.Id
-                        }).ToList()
-                    };
-
-                    _context.Doctores.Add(doctor);
-                    await _context.SaveChangesAsync();
-                }
-                return true;
             }
-            catch (Exception ex)
-            {
-                Console.Write(ex.Message);
-                return false;
-            }
-
+            return true;
         }
         public async Task<bool> UpdateUsuarioAsync(int id, UpdateUsuarioRequestDto dto)
         {
